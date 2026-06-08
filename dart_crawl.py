@@ -18,13 +18,21 @@ BASE = "https://dart.fss.or.kr"
 
 
 def _make_session() -> requests.Session:
+    import time
     session = requests.Session()
     session.headers.update({
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
         "Referer": f"{BASE}/dsae001/main.do",
         "X-Requested-With": "XMLHttpRequest",
     })
-    session.get(f"{BASE}/dsae001/main.do", timeout=15)
+    for attempt in range(3):
+        try:
+            session.get(f"{BASE}/dsae001/main.do", timeout=15)
+            return session
+        except requests.exceptions.ConnectionError:
+            if attempt == 2:
+                raise
+            time.sleep(3)
     return session
 
 

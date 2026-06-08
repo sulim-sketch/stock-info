@@ -10,22 +10,22 @@ core16 = create_client(
     os.environ["SUPABASE_CORE16_ANON_KEY"],
 )
 dev = create_client(
-    os.environ["DEV_SUPPLY_CHAIN_URL"].rstrip("/").removesuffix("/rest/v1"),
-    os.environ["DEV_SUPPLY_CHAIN_SERVICE_ROLE_KEY"],
+    os.environ["SUPABASE_SUPPLY_CHAIN_URL"].rstrip("/").removesuffix("/rest/v1"),
+    os.environ["SUPABASE_SUPPLY_CHAIN_SERVICE_ROLE_KEY"],
 )
 
 TARGET_GROUP_CODES = {"ST", "FS", "DR"}
 
 # ---------------------------------------------------------------
-# 1. stock_info_duplicate 전체 티커 수집
+# 1. stock_info 전체 티커 수집
 # ---------------------------------------------------------------
-print("▶ [1] stock_info_duplicate 티커 수집 중...")
+print("▶ [1] stock_info 티커 수집 중...")
 dup_rows = []
 page_size = 1000
 offset = 0
 while True:
     batch = (
-        dev.table("stock_info_duplicate")
+        dev.table("stock_info")
         .select("ticker")
         .range(offset, offset + page_size - 1)
         .execute()
@@ -90,7 +90,7 @@ for ticker in to_delete:
 if to_delete:
     print(f"\n▶ [4] {len(to_delete)}개 행 삭제 중...")
     for ticker in to_delete:
-        dev.table("stock_info_duplicate").delete().eq("ticker", ticker).execute()
+        dev.table("stock_info").delete().eq("ticker", ticker).execute()
     print("   → 삭제 완료")
 else:
     print("\n삭제 대상 없음")
