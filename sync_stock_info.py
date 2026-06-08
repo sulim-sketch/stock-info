@@ -223,8 +223,8 @@ print(f"   → 신규 삽입: {len(to_insert)}개")
 
 # ---------------------------------------------------------------
 # 5. dart_name 업데이트
-#    corp_code.xlsx의 corp_name과 stock_info_duplicate의 name이 다른 경우
-#    corp_name을 dart_name 컬럼에 저장 (DART 공식 기업명 보존 목적)
+#    corp_code.xlsx의 corp_name을 dart_name 컬럼에 항상 저장
+#    (DART에 등록되지 않은 종목은 그대로 NULL 유지)
 # ---------------------------------------------------------------
 print("▶ [5] dart_name 업데이트 중...")
 
@@ -237,21 +237,20 @@ for ticker, dup in dup_map.items():
     corp_name = corp_map.get(ticker)
     if not corp_name:
         continue
-    # step 3에서 name이 갱신됐을 수 있으므로, 갱신된 이름(name_kr)과 비교
-    # universe_map에 없는 티커(비활성 처리된 경우)는 기존 dup name 사용
-    current_name = universe_map[ticker]["name_kr"] if ticker in universe_map else dup["name"]
+    # 이미 동일한 값이면 스킵
+    if dup["dart_name"] == corp_name:
+        continue
 
-    if current_name == corp_name:
-        # 이름 일치 → dart_name은 NULL이어야 함. 이미 NULL이면 스킵
-        if dup["dart_name"] is None:
-            continue
-        dev.table("stock_info_duplicate").update({"dart_name": None}).eq("ticker", ticker).execute()
-    else:
-        # 이름 불일치 → dart_name을 corp_name으로 업데이트. 이미 동일한 값이면 스킵
-        if dup["dart_name"] == corp_name:
-            continue
-        dev.table("stock_info_duplicate").update({"dart_name": corp_name}).eq("ticker", ticker).execute()
+    update_payload = {"dart_name": corp_name}
 
+    # 기존 dart_name이 있으면 old_dart_names에 보관
+    if dup["dart_name"] is not None:
+        old_dart_names = dup["old_dart_names"] or []
+        if dup["dart_name"] not in old_dart_names:
+            old_dart_names.append(dup["dart_name"])
+        update_payload["old_dart_names"] = old_dart_names
+
+    dev.table("stock_info_duplicate").update(update_payload).eq("ticker", ticker).execute()
     dart_updated += 1
 
 print(f"   → dart_name 업데이트: {dart_updated}개")
