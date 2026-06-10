@@ -10,15 +10,15 @@ load_dotenv()
 # ---------------------------------------------------------------
 # 클라이언트 초기화
 # - CORE16         : security_universe_kr 조회용 (anon key)
-# - DEV_SUPPLY_CHAIN: stock_info_duplicate 읽기/쓰기용 (service_role key, RLS 우회)
+# - SUPABASE_SUPPLY_CHAIN: stock_info 읽기/쓰기용 (service_role key, RLS 우회)
 # ---------------------------------------------------------------
 core16 = create_client(
     os.environ["SUPABASE_CORE16_URL"].rstrip("/").removesuffix("/rest/v1"),
     os.environ["SUPABASE_CORE16_ANON_KEY"],
 )
 dev = create_client(
-    os.environ["DEV_SUPPLY_CHAIN_URL"].rstrip("/").removesuffix("/rest/v1"),
-    os.environ["DEV_SUPPLY_CHAIN_SERVICE_ROLE_KEY"],
+    os.environ["SUPABASE_SUPPLY_CHAIN_URL"].rstrip("/").removesuffix("/rest/v1"),
+    os.environ["SUPABASE_SUPPLY_CHAIN_SERVICE_ROLE_KEY"],
 )
 
 CORP_CODE_XLSX = "corp_code.xlsx"
@@ -117,14 +117,14 @@ print(f"   → {len(universe)}개 수집 완료")
 
 
 # ---------------------------------------------------------------
-# 2. stock_info_duplicate의 모든 행 불러오기
+# 2. stock_info의 모든 행 불러오기
 # ---------------------------------------------------------------
-print("▶ [2] stock_info_duplicate 데이터 수집 중...")
+print("▶ [2] stock_info 데이터 수집 중...")
 dup_rows = []
 offset = 0
 while True:
     batch = (
-        dev.table("stock_info_duplicate")
+        dev.table("stock_info")
         .select("*")
         .range(offset, offset + page_size - 1)
         .execute()
@@ -140,9 +140,9 @@ print(f"   → {len(dup_rows)}개 수집 완료")
 
 
 # ---------------------------------------------------------------
-# 3. stock_info_duplicate 행 순회 → 업데이트
+# 3. stock_info 행 순회 → 업데이트
 # ---------------------------------------------------------------
-print("▶ [3] stock_info_duplicate 업데이트 중...")
+print("▶ [3] stock_info 업데이트 중...")
 updated_inactive = 0
 updated_active   = 0
 
@@ -152,7 +152,7 @@ for dup in dup_rows:
     # 3-1. 티커가 security_universe_kr에 없는 경우
     #      → 비활성 처리: is_active=False, 상태 플래그 3개 NULL
     if ticker not in universe_map:
-        dev.table("stock_info_duplicate").update({
+        dev.table("stock_info").update({
             "is_active":    False,
             "trht_yn":      None,
             "sltr_yn":      None,
@@ -180,7 +180,7 @@ for dup in dup_rows:
         update_payload["old_names"] = old_names
         update_payload["name"] = uni["name_kr"]
 
-    dev.table("stock_info_duplicate").update(update_payload).eq("ticker", ticker).execute()
+    dev.table("stock_info").update(update_payload).eq("ticker", ticker).execute()
     updated_active += 1
 
 print(f"   → 비활성 처리: {updated_inactive}개 / 활성 업데이트: {updated_active}개")
@@ -188,7 +188,7 @@ print(f"   → 비활성 처리: {updated_inactive}개 / 활성 업데이트: {u
 
 # ---------------------------------------------------------------
 # 4. security_universe_kr 행 순회 → 신규 종목 삽입
-#    stock_info_duplicate에 없는 티커만 INSERT
+#    stock_info에 없는 티커만 INSERT
 #    category 관련 컬럼은 security_universe_kr에 없으므로 NULL로 삽입
 # ---------------------------------------------------------------
 print("▶ [4] 신규 종목 삽입 중...")
@@ -216,7 +216,7 @@ for uni in universe:
     })
 
 if to_insert:
-    dev.table("stock_info_duplicate").insert(to_insert).execute()
+    dev.table("stock_info").insert(to_insert).execute()
 
 print(f"   → 신규 삽입: {len(to_insert)}개")
 
@@ -250,7 +250,7 @@ for ticker, dup in dup_map.items():
             old_dart_names.append(dup["dart_name"])
         update_payload["old_dart_names"] = old_dart_names
 
-    dev.table("stock_info_duplicate").update(update_payload).eq("ticker", ticker).execute()
+    dev.table("stock_info").update(update_payload).eq("ticker", ticker).execute()
     dart_updated += 1
 
 print(f"   → dart_name 업데이트: {dart_updated}개")

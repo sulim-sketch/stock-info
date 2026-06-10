@@ -1,5 +1,5 @@
 """
-stock_info_duplicate의 각 티커에 대해 DART 회사이름 변경내역을 크롤링하여
+stock_info의 각 티커에 대해 DART 회사이름 변경내역을 크롤링하여
 로컬 SQLite DB에 저장하는 일회성 스크립트.
 
 테이블: dart_name_history
@@ -19,8 +19,8 @@ sys.stdout.reconfigure(encoding="utf-8")
 load_dotenv()
 
 dev = create_client(
-    os.environ["DEV_SUPPLY_CHAIN_URL"].rstrip("/").removesuffix("/rest/v1"),
-    os.environ["DEV_SUPPLY_CHAIN_SERVICE_ROLE_KEY"],
+    os.environ["SUPABASE_SUPPLY_CHAIN_URL"].rstrip("/").removesuffix("/rest/v1"),
+    os.environ["SUPABASE_SUPPLY_CHAIN_SERVICE_ROLE_KEY"],
 )
 
 DB_PATH = "dart_name_history.db"
@@ -29,14 +29,14 @@ REQUEST_INTERVAL = 0.3
 
 
 # ---------------------------------------------------------------
-# 1. stock_info_duplicate 전체 티커 수집
+# 1. stock_info 전체 티커 수집
 # ---------------------------------------------------------------
-print("▶ [1] stock_info_duplicate 티커 수집 중...")
+print("▶ [1] stock_info 티커 수집 중...")
 tickers = []
 offset = 0
 while True:
     batch = (
-        dev.table("stock_info_duplicate")
+        dev.table("stock_info")
         .select("ticker")
         .range(offset, offset + page_size - 1)
         .execute()
@@ -93,7 +93,13 @@ skipped_not_found = 0
 skipped_no_history = 0
 
 for i, ticker in enumerate(remaining, 1):
-    info = get_company_info(ticker)
+    try:
+        info = get_company_info(ticker)
+    except Exception as e:
+        print(f"   [{i}] {ticker} 오류: {e}")
+        skipped_not_found += 1
+        time.sleep(3)
+        continue
 
     if not info:
         skipped_not_found += 1
